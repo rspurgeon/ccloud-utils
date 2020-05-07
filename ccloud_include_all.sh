@@ -9,5 +9,5 @@
 #   any repercussions of that.  I tried using some "include guards" but
 #   that has it's own downsides to discuss.  Might be a better way to 
 #   prevent redundant sourcing of the same file per top level scripts
-source $CCLOUD_UTILS_HOME/ccloud_cli_helpers.env
-# source $CCLOUD_UTILS_HOME/next_helper_we_want.env
+source $CCLOUD_UTILS_HOME/ccloud_cli_helpers.sh
+# source $CCLOUD_UTILS_HOME/next_helper_we_want.sh

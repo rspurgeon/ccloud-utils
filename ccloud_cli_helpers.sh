@@ -5,22 +5,22 @@
 # calling script to run anywhere as long as you set it properly
 [ -z ${CCLOUD_UTILS_HOME} ] && { printf "\nCCLOUD_UTILS_HOME is required to be set to use this library\n";exit 1; }
 
-source $CCLOUD_UTILS_HOME/error-handling.env
-source $CCLOUD_UTILS_HOME/common.env
+source $CCLOUD_UTILS_HOME/error-handling.sh
+source $CCLOUD_UTILS_HOME/common.sh
 
 function check_ccloud_command() {
   command -v ccloud > /dev/null 2>&1 || return $COMMAND_NOT_FOUND # dont exit, return code.  It's up to caller to decide to exit
 }
 
 # Here is an example of how this function might be tested indepdendently of any parent script:
-#   $ test CCLOUD_UTILS_HOME=.;source ccloud_cli_helpers.env;validate_ccloud_version -r 1.1.0 || { printf "\nERROR! Wake up Yeva Byzek, but let Rick sleep\n" }
+#   $ test CCLOUD_UTILS_HOME=.;source ccloud_cli_helpers.sh;validate_ccloud_version -r 1.1.0 || { printf "\nERROR! Wake up Yeva Byzek, but let Rick sleep\n" }
 #     ERROR! Wake up Yeva Byzek, but let Rick sleep
 #
 # We could look to automate testing of functions which themselves excercise platform behaviors to
 #   look to automate validation
 # 
 # Here is how you can see the function's usage:
-#   $ CCLOUD_UTILS_HOME=.;source ccloud_cli_helpers.env;validate_ccloud_version -h
+#   $ CCLOUD_UTILS_HOME=.;source ccloud_cli_helpers.sh;validate_ccloud_version -h
 #     Usage: validate_ccloud_version -r required_version
 #
 function validate_ccloud_version() {
