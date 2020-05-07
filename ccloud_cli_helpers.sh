@@ -44,3 +44,26 @@ function validate_ccloud_version() {
   version_gt -r $REQUIRED_VERSION -v $ACTUAL_VERSION 
 }
 
+function get_ccloud_kafka_cluster_create_command() {
+	check_ccloud_command || return $?	
+
+	# this might be better as a heredoc somewhere
+  local USAGE="\nUsage: ccloud_kafka_cluster_create -n cluster_name -c cloud_provider -r region \n\n\tcloud_provider = [ aws, gcp, az ]"
+  local CLUSTER_NAME=""
+	local CLUSTER_CLOUD=""
+	local CLUSTER_REGION=""
+
+  OPTIND=1
+  while getopts ":n:c:r:" opt; do
+    case "${opt}" in 
+			n)  CLUSTER_NAME=${OPTARG};;
+			c)  CLUSTER_CLOUD=${OPTARG};;
+      r)  CLUSTER_REGION=${OPTARG};;
+      ?) printf "$USAGE";return $INVALID_FUNCTION_PARAMETERS;;
+    esac
+  done
+  shift $((OPTIND-1))
+  [ -z ${CLUSTER_NAME} ] || [ -z ${CLUSTER_CLOUD} ] || [ -z ${CLUSTER_REGION} ] && return $INVALID_FUNCTION_PARAMETERS
+
+	printf "ccloud kafka cluster create $CLUSTER_NAME --cloud $CLUSTER_CLOUD --region $CLUSTER_REGION"	
+}

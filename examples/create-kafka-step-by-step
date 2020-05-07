@@ -1,0 +1,75 @@
+#!/bin/bash
+
+CCLOUD_UTILS_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/..
+
+AUTO=${AUTO:-false}
+
+source $CCLOUD_UTILS_HOME/ccloud_include_all.sh
+
+NAME=`basename "$0"`
+
+UNIQUE_ID=${UNIQUE_ID:-$((1 + RANDOM % 1000000))}
+
+check_ccloud_command \
+  && print_pass "ccloud available\n" \
+  || exit_with_error -c $? -n $NAME -l $LINENO -m "ccloud command not found. Install Confluent Cloud CLI (https://docs.confluent.io/current/quickstart/cloud-quickstart/index.html#step-2-install-the-ccloud-cli) and try again"
+
+REQUIRED_CCLOUD_VERSION=${REQUIRED_CCLOUD_VERSION:-1.0.0}
+validate_ccloud_version -r $REQUIRED_CCLOUD_VERSION \
+  && print_pass "ccloud version check >= $REQUIRED_CCLOUD_VERSION\n" \
+  || exit_with_error -c $? -n $NAME -m "ccloud version check" -l $(($LINENO -2))
+
+# Waving hands for now at create / use environment
+# ccloud environment use $0
+
+CLUSTER_NAME=${CLUSTER_NAME:-"demo-kafka-cluster-${UNIQUE_ID}"}
+CLUSTER_CLOUD=${CLUSTER_CLOUD:-"aws"}
+CLUSTER_REGION=${CLUSTER_REGION:-"us-west-2"}
+
+[ "$AUTO" == "false" ] && { 
+	printf "\nLet's setup a Kafka cluster in Confluent Cloud. The cluster will be created in the current environment.\n\nHere are your available environments:\n$(ccloud environment list)\n\nThe current one designated with the * character above.  If you do not see an asterisk, ctrl-c from this tutorial and use ccloud environment list and ccloud environment use to set the current environment.\n"
+
+	printf "\nReady to continue:\n"
+	select yn in "yes" "no"; do
+		case $yn in
+			yes) break;;
+			no) exit 1;;
+			?) printf "bad command, quiting on you"; exit 1;;
+		esac
+	done
+
+	printf "\nGood decision, let's choose a name for your cluster, enter it now: "
+	read CLUSTER_NAME
+
+	printf "\nI'm hopeful $CLUSTER_NAME is a legal name.\n\n"
+
+	printf "Now let's pick which cloud provider you want the cloud to be deployed to (aws, gcp, az):\n"
+	select CLUSTER_CLOUD in "aws" "gcp" "az"; do
+		case $CLUSTER_CLOUD in
+			*) break;
+		esac
+	done
+
+	printf "\nNow let's pick a region in $CLUSTER_CLOUD you want the cloud to be deployed. This needs to be a valid region name: "
+	read CLUSTER_REGION
+
+	printf "Got it, now we have enough information to proceed, here is the command we will execute to provision the Kafka cluster.\n"
+}
+
+CMD=$(get_ccloud_kafka_cluster_create_command -n $CLUSTER_NAME -c $CLUSTER_CLOUD -r $CLUSTER_REGION)
+printf "\n$CMD\n"
+
+
+[ "$AUTO" == "false" ] && {
+	printf "\nLook good? If yes we'll run it\n"
+	select yn in "yes" "no"; do
+		case $yn in
+			yes) break;;
+			no) exit 1;;
+			?) printf "bad command, quiting on you"; exit 1;;
+		esac
+	done	
+}
+eval $CMD
+
+
