@@ -21,17 +21,17 @@ check_ccloud_command \
   && print_pass "ccloud available\n" \
   || exit_with_error -c $? -n $NAME -l $LINENO -m "ccloud command not found. Install Confluent Cloud CLI (https://docs.confluent.io/current/quickstart/cloud-quickstart/index.html#step-2-install-the-ccloud-cli) and try again"
 
-REQUIRED_CCLOUD_VERSION=1.0.0
+REQUIRED_CCLOUD_VERSION=${REQUIRED_CCLOUD_VERSION:-1.0.0}
 # I like this program flow of this...
 #   perform_function \ 
 #     on_success \
 #     on_failure
 validate_ccloud_version -r $REQUIRED_CCLOUD_VERSION \
-  && print_pass "ccloud version check $REQUIRED_CCLOUD_VERSION\n" \
-  || exit_with_error -c $? -n $NAME -m testmsg -l $LINENO  
+  && print_pass "ccloud version check >= $REQUIRED_CCLOUD_VERSION\n" \
+  || exit_with_error -c $? -n $NAME -m "ccloud version check" -l $(($LINENO -2))
 
 # A sample function that always fails
 degenerate \
   && print_pass "Waaahahah??" \
-  || exit_with_error -c $? -n $NAME -l $LINENO -m "degenerate function always fails" 
+  || exit_with_error -c $? -n $NAME -l $(($LINENO-2)) -m "degenerate function always fails" 
 
