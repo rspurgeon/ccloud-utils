@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 CCLOUD_UTILS_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/..
 
 AUTO=${AUTO:-false}
@@ -8,7 +10,7 @@ source $CCLOUD_UTILS_HOME/ccloud_include_all.sh
 
 NAME=`basename "$0"`
 
-UNIQUE_ID=${UNIQUE_ID:-$((1 + RANDOM % 1000000))}
+printf "\nChecking prerequisites...\n"
 
 check_ccloud_command \
   && print_pass "ccloud available\n" \
@@ -19,57 +21,104 @@ validate_ccloud_version -r $REQUIRED_CCLOUD_VERSION \
   && print_pass "ccloud version check >= $REQUIRED_CCLOUD_VERSION\n" \
   || exit_with_error -c $? -n $NAME -m "ccloud version check" -l $(($LINENO -2))
 
-# Waving hands for now at create / use environment
-# ccloud environment use $0
+print_pass "prequisite check complete\n"
 
+UNIQUE_ID=${UNIQUE_ID:-$((1 + RANDOM % 1000000))}
 CLUSTER_NAME=${CLUSTER_NAME:-"demo-kafka-cluster-${UNIQUE_ID}"}
 CLUSTER_CLOUD=${CLUSTER_CLOUD:-"aws"}
 CLUSTER_REGION=${CLUSTER_REGION:-"us-west-2"}
+SERVICE_ACCOUNT_NAME=${SERVICE_ACCOUNT_NAME:-"demo-account-${UNIQUE_ID}"}
 
 [ "$AUTO" == "false" ] && { 
-	printf "\nLet's setup a Kafka cluster in Confluent Cloud. The cluster will be created in the current environment.\n\nHere are your available environments:\n$(ccloud environment list)\n\nThe current one designated with the * character above.  If you do not see an asterisk, ctrl-c from this tutorial and use ccloud environment list and ccloud environment use to set the current environment.\n"
+  printf "\nThis tutorial will collect information from you, build commands, show them with arguments and values, and execute them on your behalf as you proceed through the steps. ctrl-c at any time to stop.\n"
+  
+  printf "\nLet's setup a Kafka cluster in Confluent Cloud.\n"
 
-	printf "\nReady to continue:\n"
-	select yn in "yes" "no"; do
-		case $yn in
-			yes) break;;
-			no) exit 1;;
-			?) printf "bad command, quiting on you"; exit 1;;
-		esac
-	done
+  printf "Kafka clusters in Confluent Cloud run inside of 'environments'. Let's select the environment to use for our new Kafka cluster. You can list environments with the command:\n\n$ ccloud environment list\n\nHere are your available environments:\n$(ccloud environment list)\n\n"
 
-	printf "\nGood decision, let's choose a name for your cluster, enter it now: "
-	read CLUSTER_NAME
+  read -r -p "Enter the Id of the environment you wish to use: " ENVIRONMENT_ID
+ 
+  [ -z "$ENVIRONMENT_ID" ] || {
+    printf "\nNow you instruct the ccloud CLI to use this environment for subsequent commands, like so:\n"  
+    CMD=$(get_ccloud_environment_use_command -i $ENVIRONMENT_ID)
+    printf "\n$ $CMD\n\n"
+    
+    read -n 1 -r -s -p $'Press any key to execute and continue...'
+  }
 
-	printf "\nI'm hopeful $CLUSTER_NAME is a legal name.\n\n"
+  printf "\n\n"
+  read -r -p "Let's give your new Kafka Cluster a name, enter it now: " CLUSTER_NAME
+ 
+  [ -z "$CLUSTER_NAME" ] || { 
+    printf "\nNow let's pick which cloud provider you want the cloud to be deployed to (aws, gcp, az):\n"
+    select CLUSTER_CLOUD in "aws" "gcp" "az"; do
+      case $CLUSTER_CLOUD in
+        *) break;
+      esac
+    done
 
-	printf "Now let's pick which cloud provider you want the cloud to be deployed to (aws, gcp, az):\n"
-	select CLUSTER_CLOUD in "aws" "gcp" "az"; do
-		case $CLUSTER_CLOUD in
-			*) break;
-		esac
-	done
+    printf "\nFinally let's pick a region in $CLUSTER_CLOUD where you want the Kafa cluster to be deployed.\n"
+    read -r -p "Enter a valid $CLUSTER_CLOUD region name: " CLUSTER_REGION
 
-	printf "\nNow let's pick a region in $CLUSTER_CLOUD you want the cloud to be deployed. This needs to be a valid region name: "
-	read CLUSTER_REGION
-
-	printf "Got it, now we have enough information to proceed, here is the command we will execute to provision the Kafka cluster.\n"
+    printf "\nHere is the command you will execute to provision the $CLUSTER_NAME Kafka cluster to $CLUSTER_CLOUD in $CLUSTER_REGION:\n"
+  }
 }
 
-CMD=$(get_ccloud_kafka_cluster_create_command -n $CLUSTER_NAME -c $CLUSTER_CLOUD -r $CLUSTER_REGION)
-printf "\n$CMD\n"
-
+[ -z "$CLUSTER_NAME" ] || {
+  CMD=$(get_ccloud_kafka_cluster_create_command -n $CLUSTER_NAME -c $CLUSTER_CLOUD -r $CLUSTER_REGION)
+  printf "\n$ $CMD\n"
+  
+  [ "$AUTO" == "false" ] && {
+    read -n 1 -r -s -p $'\nPress any key to execute and continue...'
+    printf "\n"
+  }
+  
+  eval $CMD
+}
 
 [ "$AUTO" == "false" ] && {
-	printf "\nLook good? If yes we'll run it\n"
-	select yn in "yes" "no"; do
-		case $yn in
-			yes) break;;
-			no) exit 1;;
-			?) printf "bad command, quiting on you"; exit 1;;
-		esac
-	done	
-}
-eval $CMD
+  [ -z "$CLUSTER_NAME" ] || {
+    printf "\nAbove you should see a print out of relevant details on your new Kafka cluster. You should also be able to view and manage the cluster in the Confluent Cloud UI now.\n"
+  }
 
+  printf "\nNow we are going to create a service account and an api-key for your new cluster.\n"
+  printf "\nFirst the service account:\n\t"
+  read -r -p "Enter a name for the account: " SERVICE_ACCOUNT_NAME
+  printf "\t"
+  read -r -p "Enter a description for the account: " SERVICE_ACCOUNT_DESCRIPTION
+  printf "\nHere is the ccloud command you would use to create the $SERVICE_ACCOUNT_NAME account\n"
+}
+
+CMD=$(get_ccloud_serviceaccount_create_command -n $SERVICE_ACCOUNT_NAME -d $SERVICE_ACCOUNT_DESCRIPTION)
+printf "\n$ $CMD\n"
+
+[ "$AUTO" == "false" ] && {
+  read -n 1 -r -s -p $'\nPress any key to execute and continue...'
+  printf "\n"
+}
+
+SERVICE_ACCOUNT_ID=$(eval $CMD | jq -r ".id")
+
+[ "$AUTO" == "false" ] && {
+  printf "\nService Account $SERVICE_ACCOUNT_NAME was created and assigned ID $SERVICE_ACCOUNT_ID\n"
+  printf "\nHere is how to see all your service accounts:\n"
+
+  CMD=$(get_ccloud_serviceaccount_list_command)  
+  printf "\n$ $CMD\n"
+  eval $CMD
+  
+  printf "\nNow you create an api-key and map it to the service account and the Kafka cluster, like so:\n"
+  
+  CMD=$(get_ccloud_apikey_create_command -s $SERVICE_ACCOUNT_ID -r $CL)
+}
+ 
+# CMD=$(get_ccloud_apikey_create -s $SERVICE_ACCOUNT_ID -r $)
+# printf "\n$ CMD\n"
+#     # OUTPUT=$(ccloud api-key create --service-account $SERVICE_ACCOUNT_ID --resource $RESOURCE -o json)
+#   # API_KEY_SA=$(echo "$OUTPUT" | jq -r ".key")
+#   # API_SECRET_SA=$(echo "$OUTPUT" | jq -r ".secret")
+# 
+# MAX_WAIT=720
+# printf "\nWaiting up to $MAX_WAIT seconds for Confluent Cloud cluster to be ready and for credentials to propagate"
+# retry $MAX_WAIT check_ccloud_cluster_ready || exit 1
 

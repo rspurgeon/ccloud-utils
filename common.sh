@@ -1,4 +1,26 @@
 
+function retry() {
+    local -r -i max_wait="$1"; shift
+    local -r cmd="$@"
+
+    local -i sleep_interval=5
+    local -i curr_wait=0
+
+    until $cmd
+    do
+        if (( curr_wait >= max_wait ))
+        then
+            echo "ERROR: Failed after $curr_wait seconds. Please troubleshoot and run again."
+            return 1
+        else
+            printf "."
+            curr_wait=$((curr_wait+sleep_interval))
+            sleep $sleep_interval
+        fi
+    done
+    printf "\n"
+}
+
 # functions don't call exit, they return codes only
 function check_jq_command() {
   command -v jq > /dev/null 2>&1 || return $COMMAND_NOT_FOUND
